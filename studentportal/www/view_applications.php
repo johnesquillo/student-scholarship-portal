@@ -1,37 +1,30 @@
 <?php
-$host = "fdb1034.awardspace.net";             // usually localhost on AwardSpace
-$user = "4669763_john";          // your DB username
-$password = "plmun2023";  // your DB password
-$database = "4669763_john";      // your DB name
-
-$conn = new mysqli($host, $user, $password, $database);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// === FETCH APPLICATIONS ===
-$result = $conn->query("SELECT * FROM applications ORDER BY application_date DESC");
-
-// === FETCH STATS FOR DASHBOARD ===
+require_once __DIR__ . '/bootstrap.php';
+require_login();
+require __DIR__ . '/db.php';
+$userId = (int)$_SESSION['user_id'];
+$stmt = $conn->prepare('SELECT * FROM applications WHERE user_id = ? ORDER BY application_date DESC');
+$stmt->bind_param('i', $userId);
+$stmt->execute();
+$result = $stmt->get_result();
+$applications = $result->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 $counts = ['Pending' => 0, 'Approved' => 0, 'Rejected' => 0];
-$total = 0;
-
-$status_query = $conn->query("SELECT status, COUNT(*) as count FROM applications GROUP BY status");
-while ($row = $status_query->fetch_assoc()) {
-    $status = $row['status'];
-    $counts[$status] = $row['count'];
-    $total += $row['count'];
+foreach ($applications as $application) {
+    if (isset($counts[$application['status']])) {
+        $counts[$application['status']]++;
+    }
 }
-
+$total = count($applications);
 $percentages = [];
 foreach ($counts as $status => $count) {
-    $percentages[$status] = $total > 0 ? round(($count / $total) * 100, 1) : 0;
+    $percentages[$status] = $total > 0 ? round($count / $total * 100, 1) : 0;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="js/preferences.js"></script>
   <meta charset="UTF-8" />
   <title>View Applications</title>
   <style>
@@ -201,6 +194,8 @@ foreach ($counts as $status => $count) {
 
     h2 { text-align: center; color: #ffffff; }
   </style>
+  <link rel="stylesheet" href="css/portal.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
   <div class="sidebar" id="sidebar">
@@ -209,13 +204,13 @@ foreach ($counts as $status => $count) {
     <a href="view_applications.php" class="active">Status Applications</a>
     <a href="contact.php">Contact</a>
     <a href="FAQ.php">FAQ</a>
-    <a href="logout.php">Logout</a>
+    <?= logout_form() ?>
   </div>
 
   <div class="header" id="header">
     <div style="display: flex; align-items: center;">
       <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
-      <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin: 0 10px;" />
+      <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin: 0 10px;" />
       <h2>Pamantasan ng Lungsod ng Muntinlupa</h2>
     </div>
   </div>
@@ -238,7 +233,8 @@ foreach ($counts as $status => $count) {
     </div>
 
     <!-- APPLICATION TABLE -->
-    <h2 style="color: black;">Manage Student Applications</h2>
+    <h2 style="color: black;">My Applications</h2>
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -250,7 +246,8 @@ foreach ($counts as $status => $count) {
         </tr>
       </thead>
       <tbody>
-      <?php while($row = $result->fetch_assoc()): ?>
+      <?php if (!$applications): ?><tr><td colspan="5">You have not submitted an application yet.</td></tr><?php endif; ?>
+      <?php foreach ($applications as $row): ?>
         <tr>
           <td><?= htmlspecialchars($row['scholarship_id']) ?></td>
           <td><?= htmlspecialchars($row['name']) ?></td>
@@ -258,9 +255,10 @@ foreach ($counts as $status => $count) {
           <td><?= htmlspecialchars($row['application_date']) ?></td>
           <td class="<?= strtolower($row['status']) ?>"><?= htmlspecialchars($row['status']) ?></td>
         </tr>
-      <?php endwhile; ?>
+      <?php endforeach; ?>
       </tbody>
     </table>
+    </div>
   </div>
 
   <script>
@@ -275,7 +273,7 @@ foreach ($counts as $status => $count) {
     }
 
     window.onload = function() {
-      const savedTheme = localStorage.getItem('theme');
+      const savedTheme = portalStorage.getItem('theme');
       if (savedTheme === 'dark') {
         document.body.classList.add('dark-mode');
       } else {

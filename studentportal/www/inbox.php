@@ -1,25 +1,12 @@
 <?php
-session_start();
-if (!isset($_SESSION['email'])) {
-    header("Location: index.php");
-    exit();
-}
+require_once __DIR__ . '/admin_auth.php';
+require_admin_access();
 
-// === DB CONNECTION ===
-$host = "fdb1034.awardspace.net";   // AwardSpace host
-$user = "4669763_john";             // DB username
-$password = "plmun2023";            // DB password
-$database = "4669763_john";         // DB name
-
-$conn = new mysqli($host, $user, $password, $database);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-$conn->set_charset("utf8mb4");
+require __DIR__ . '/db.php';
 
 // ✅ Use the correct table name: contact_message
-$sql = "SELECT id, name, email, message, submitted_at, created_at 
-        FROM contact_message 
+$sql = "SELECT id, name, email, message, created_at
+        FROM contact_message
         ORDER BY created_at DESC";
 $result = $conn->query($sql);
 ?>
@@ -113,17 +100,18 @@ $result = $conn->query($sql);
       margin-top: 0;
     }
   </style>
+  <link rel="stylesheet" href="css/portal.css">
 </head>
 <body>
   <!-- Header Section -->
   <header>
     <h1>
-      <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
+      <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
       PLMun Scholarship Admin
     </h1>
     <nav>
       <a href="manage_applications.php">Home</a>
-      <a href="admin_logout.php">Logout</a>
+      <?= logout_form('admin_logout.php') ?>
     </nav>
   </header>
 
@@ -154,9 +142,13 @@ $result = $conn->query($sql);
                 <td><?= htmlspecialchars($row['name']); ?></td>
                 <td><?= htmlspecialchars($row['email']); ?></td>
                 <td><?= nl2br(htmlspecialchars($row['message'])); ?></td>
-                <td><?= htmlspecialchars($row['submitted_at'] ?: $row['created_at']); ?></td>
+                <td><?= htmlspecialchars($row['created_at']); ?></td>
                 <td class="actions">
-                  <a href="delete_message.php?id=<?= (int)$row['id']; ?>" class="delete" onclick="return confirm('Delete this message?');">Delete</a>
+                  <form action="delete_message.php" method="post">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                    <button type="submit" onclick="return confirm('Delete this message?');">Delete</button>
+                  </form>
                 </td>
               </tr>
             <?php endwhile; ?>

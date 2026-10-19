@@ -2,10 +2,16 @@
   "name": "com.yourcompany.studentportal",
   "displayName": "StudentPortal",
   "version": "1.0.0",
-  "description": "A sample Apache Cordova application that responds to the deviceready event.",
-  "main": "index.js",
+  "description": "React Native scholarship portal with a PHP and MySQL backend",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "php -d upload_max_filesize=5M -d post_max_size=52M -S 127.0.0.1:8080 -t www scripts/browser-router.php",
+    "test": "python3 -m unittest discover -s tests -v",
+    "lint": "php scripts/lint.php && npm --prefix mobile run lint",
+    "mobile:web": "npm --prefix mobile run web",
+    "mobile:start": "npm --prefix mobile start",
+    "build:web": "npm --prefix mobile run build:web",
+    "typecheck": "npm --prefix mobile run typecheck",
+    "test:e2e": "npm --prefix mobile run test:e2e"
   },
   "keywords": [
     "ecosystem:cordova"

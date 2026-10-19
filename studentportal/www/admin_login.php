@@ -1,6 +1,9 @@
 <?php
 
-    session_start();
+    require_once __DIR__ . '/bootstrap.php';
+    if (!empty($_SESSION['user_id'])) {
+        redirect_to(in_array($_SESSION['role'] ?? '', ['admin', 'staff'], true) ? 'manage_applications.php' : 'home.php');
+    }
 
     $errors = [
         'login' => $_SESSION['login_error'] ?? '',
@@ -9,10 +12,11 @@
 
     $activeForm = $_SESSION['active_form'] ?? 'login';
 
-    session_unset();
+    $notice = $_SESSION['login_notice'] ?? '';
+    unset($_SESSION['login_error'], $_SESSION['register_error'], $_SESSION['active_form'], $_SESSION['login_notice']);
 
     function showError($error) {
-        return !empty($error) ? "<p class='error-message'>$error</p>" : '';
+        return !empty($error) ? "<p class='error-message'>" . e($error) . "</p>" : '';
     }
 
     function isActiveForm($formName, $activeForm) {
@@ -25,35 +29,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Admin / Staff Login</title>
+    <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/portal.css">
 </head>
 <body>
    <div class="container">
         <div class="form-box <?= isActiveForm('login', $activeForm); ?>" id="login-form">
             <div class="header-logo">
-                <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
+                <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
             </div>
 
             <form action="login_register.php" method="post">
-                <h2>Admin Dashboard</h2>
+                <?= csrf_field() ?>
+                <input type="hidden" name="login_context" value="admin">
+                <h2>Admin / Staff Login</h2>
                 <?= showError($errors['login']); ?>
-                <p>Admin</p>
+                <?php if ($notice): ?><p class="form-feedback"><?= e($notice) ?></p><?php endif; ?>
+                <p>Admin / Staff</p>
                 <input type="email" name="email" placeholder="Email" required>
-                <input type="password" name="password" placeholder="Password" required>
+                <input type="password" name="password" placeholder="Password" maxlength="72" required>
                 <button type="submit" name="login">Login</button>
-                
+
             </form>
         </div>
-         <div class="container">
-        <div class="form-box <?= isActiveForm('register', $activeForm); ?>" id="register-form">
-            <div class="header-logo">
-                <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
-            </div>
-
-           
-        </div>
-       </div>
-        <script src="script.js"></script>
+        <p><a href="index.php">Student Login</a></p>
+   </div>
+        <script src="js/script.js"></script>
 </body>
 </html>

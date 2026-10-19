@@ -1,20 +1,19 @@
-<?php 
-session_start();
-if (!isset($_SESSION['email'])) {
-    header("Location: index.php");
-    exit();
+<?php
+require_once __DIR__ . '/admin_auth.php';
+require_admin_access();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $action = input_value($_POST, 'action');
+    $uid = filter_var(input_value($_POST, 'user_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $sid = filter_var(input_value($_POST, 'scholarship_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if (!$uid || !$sid || !in_array($action, ['remove', 'reapply'], true)) {
+        http_response_code(400);
+        exit('Invalid application action.');
+    }
 }
 
-// === DB CONNECTION ===
-$host = "fdb1034.awardspace.net";
-$user = "4669763_john";
-$password = "plmun2023";
-$database = "4669763_john";
-
-$conn = new mysqli($host, $user, $password, $database);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require __DIR__ . '/db.php';
 
 // === HANDLE REMOVE ===
 // Expect user_id + scholarship_id (composite key)
@@ -28,7 +27,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST"
     $stmt = $conn->prepare("DELETE FROM applications WHERE user_id = ? AND scholarship_id = ?");
     $stmt->bind_param("ii", $uid, $sid);
     $stmt->execute();
+    $affected = $stmt->affected_rows;
     $stmt->close();
+    if (!$affected) {
+        http_response_code(404);
+        exit('Application not found.');
+    }
+    redirect_to('manage_applications.php');
 }
 
 // === HANDLE RE-APPLY ===
@@ -40,10 +45,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST"
 {
     $uid = (int)$_POST['user_id'];
     $sid = (int)$_POST['scholarship_id'];
-    $stmt = $conn->prepare("UPDATE applications SET status = 'Pending', application_date = NOW() WHERE user_id = ? AND scholarship_id = ?");
+    $stmt = $conn->prepare("UPDATE applications SET status = 'Pending' WHERE user_id = ? AND scholarship_id = ? AND status = 'Rejected'");
     $stmt->bind_param("ii", $uid, $sid);
     $stmt->execute();
+    $affected = $stmt->affected_rows;
     $stmt->close();
+    if (!$affected) {
+        http_response_code(404);
+        exit('Rejected application not found.');
+    }
+    redirect_to('manage_applications.php');
 }
 
 // === FETCH APPLICATIONS SEPARATELY ===
@@ -55,6 +66,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Applications - PLMun</title>
   <style>
     body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
@@ -72,16 +84,19 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
     .reject  { background-color: #dc3545; color: white; }
     .remove  { background-color: #6c757d; color: white; }
     .reapply { background-color: #ffc107; color: black; }
+    .requirements { background-color: #004225; color: white; display: inline-block; text-decoration: none; }
+    .table-section { overflow-x: auto; }
     .pending { color: orange; } .approved { color: green; } .rejected { color: red; }
     h2 { color: #004225; }
   </style>
+  <link rel="stylesheet" href="css/portal.css">
 </head>
 <body>
 
   <!-- Header Section -->
   <header>
     <h1>
-      <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
+      <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
       PLMun Scholarship Admin
     </h1>
     <nav>
@@ -89,7 +104,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
       <a href="#approved">Approved</a>
       <a href="#rejected">Rejected</a>
       <a href="inbox.php">Messages</a>
-      <a href="admin_logout.php">Logout</a>
+      <?= logout_form('admin_logout.php') ?>
     </nav>
   </header>
 
@@ -106,6 +121,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
             <th>Course</th>
             <th>Application Date</th>
             <th>Status</th>
+            <th>Requirements</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -118,6 +134,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
             <td><?= htmlspecialchars($row['course']) ?></td>
             <td><?= htmlspecialchars($row['application_date']) ?></td>
             <td class="<?= strtolower($row['status']) ?>"><?= htmlspecialchars($row['status']) ?></td>
+            <td><a class="btn requirements" href="application_requirements.php?user_id=<?= (int)$row['user_id'] ?>&amp;scholarship_id=<?= (int)$row['scholarship_id'] ?>">View Requirements</a></td>
             <td>
               <?php if ($row['status'] === 'Pending'): ?>
                 <button class="btn approve" onclick="updateStatus(<?= (int)$row['user_id'] ?>, <?= (int)$row['scholarship_id'] ?>, 'Approved')">Approve</button>
@@ -125,6 +142,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
               <?php endif; ?>
 
               <form method="POST" style="display:inline;">
+                <?= csrf_field() ?>
                 <input type="hidden" name="user_id" value="<?= (int)$row['user_id'] ?>">
                 <input type="hidden" name="scholarship_id" value="<?= (int)$row['scholarship_id'] ?>">
                 <button type="submit" name="action" value="remove" class="btn remove" onclick="return confirm('Remove this application?');">Remove</button>
@@ -147,6 +165,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
             <th>Student</th>
             <th>Course</th>
             <th>Application Date</th>
+            <th>Requirements</th>
           </tr>
         </thead>
         <tbody>
@@ -157,6 +176,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
             <td><?= htmlspecialchars($row['name']) ?></td>
             <td><?= htmlspecialchars($row['course']) ?></td>
             <td><?= htmlspecialchars($row['application_date']) ?></td>
+            <td><a class="btn requirements" href="application_requirements.php?user_id=<?= (int)$row['user_id'] ?>&amp;scholarship_id=<?= (int)$row['scholarship_id'] ?>">View Requirements</a></td>
           </tr>
         <?php endwhile; ?>
         </tbody>
@@ -174,6 +194,7 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
             <th>Student</th>
             <th>Course</th>
             <th>Application Date</th>
+            <th>Requirements</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -185,11 +206,13 @@ $rejected_result = $conn->query("SELECT * FROM applications WHERE status = 'Reje
             <td><?= htmlspecialchars($row['name']) ?></td>
             <td><?= htmlspecialchars($row['course']) ?></td>
             <td><?= htmlspecialchars($row['application_date']) ?></td>
+            <td><a class="btn requirements" href="application_requirements.php?user_id=<?= (int)$row['user_id'] ?>&amp;scholarship_id=<?= (int)$row['scholarship_id'] ?>">View Requirements</a></td>
             <td>
               <form method="POST" style="display:inline;">
+                <?= csrf_field() ?>
                 <input type="hidden" name="user_id" value="<?= (int)$row['user_id'] ?>">
                 <input type="hidden" name="scholarship_id" value="<?= (int)$row['scholarship_id'] ?>">
-                <button type="submit" name="action" value="reapply" class="btn reapply" onclick="return confirm('Allow this student to re-apply?');">Re-Apply</button>
+                <button type="submit" name="action" value="reapply" class="btn reapply" onclick="return confirm('Return this application to pending review?');">Return to Pending</button>
               </form>
             </td>
           </tr>
@@ -205,8 +228,8 @@ function updateStatus(user_id, scholarship_id, status) {
 
   fetch('update_status.php', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `user_id=${encodeURIComponent(user_id)}&scholarship_id=${encodeURIComponent(scholarship_id)}&status=${encodeURIComponent(status)}`
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+    body: new URLSearchParams({user_id, scholarship_id, status, csrf_token: <?= json_encode(csrf_token()) ?>})
   })
   .then(r => r.json())
   .then(data => {

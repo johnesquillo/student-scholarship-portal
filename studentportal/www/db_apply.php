@@ -1,15 +1,3 @@
 <?php
-
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "scholarship_system";
-
-
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-?>
+// Backward-compatible entry point; all pages use the same settings.
+require_once __DIR__ . '/db.php';

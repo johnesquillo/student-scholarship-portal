@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
+require_login();
 if (isset($_GET['success']) && $_GET['success'] == 1) {
     $showModal = true;
 } else {
@@ -9,6 +11,7 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="js/preferences.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PLMun Scholarship Contact</title>
@@ -254,6 +257,7 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
     }
     #successModal .modal-content button:hover { background-color: #004d2a; }
   </style>
+  <link rel="stylesheet" href="css/portal.css">
 </head>
 <body>
 
@@ -264,20 +268,20 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
     <a href="view_applications.php">Status Applications</a>
     <a href="contact.php" class="active">Contact</a>
     <a href="FAQ.php">FAQ</a>
-    <a href="logout.php">Logout</a>
+    <?= logout_form() ?>
 
     <button class="sidebar-edge-toggle" id="hideBtn" type="button" title="Hide sidebar" aria-label="Hide sidebar">
-      <img src="hide.png" alt="Hide">
+      <img src="img/hide.png" alt="Hide">
     </button>
 </div>
 
 <button class="show-sidebar-btn" id="showBtn" type="button" title="Show sidebar" aria-label="Show sidebar">
-  <img src="hide.png" alt="Show">
+  <img src="img/hide.png" alt="Show">
 </button>
 
 <div class="main-content" id="mainContent">
     <header>
-        <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
+        <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="PLMun Logo">
         <h1>Pamantasan ng Lungsod ng Muntinlupa</h1>
         <p>Scholarship Portal</p>
     </header>
@@ -292,14 +296,16 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
     <div class="container">
         <h2>Send Us a Message</h2>
         <form action="submit_contact.php" method="POST">
+            <?= csrf_field() ?>
+            <?php if (isset($_GET['error'])): ?><p class="form-feedback" role="alert">Your message was not sent. Check the fields and try again.</p><?php endif; ?>
             <label for="name">Full Name</label>
-            <input type="text" id="name" name="name" required>
+            <input type="text" id="name" name="name" maxlength="100" required>
 
             <label for="email">Email Address</label>
             <input type="email" id="email" name="email" required>
 
             <label for="message">Your Message</label>
-            <textarea id="message" name="message" rows="5" required></textarea>
+            <textarea id="message" name="message" rows="5" maxlength="5000" required></textarea>
 
             <button type="submit">Send Message</button>
         </form>
@@ -325,15 +331,15 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
     }
 
     function applySavedStates() {
-        const savedTheme = localStorage.getItem('theme');
+        const savedTheme = portalStorage.getItem('theme');
         if (savedTheme === 'dark') document.body.classList.add('dark-mode');
 
-        const saved = localStorage.getItem('sidebarHidden');
+        const saved = portalStorage.getItem('sidebarHidden');
         if (saved === null) {
             const onMobile = window.matchMedia('(max-width: 820px)').matches;
             sidebar.classList.toggle('hidden', onMobile);
             mainContent.classList.toggle('shifted', onMobile);
-            try { localStorage.setItem('sidebarHidden', onMobile ? '1' : '0'); } catch(e){}
+            try { portalStorage.setItem('sidebarHidden', onMobile ? '1' : '0'); } catch(e){}
         } else {
             const hidden = saved === '1';
             sidebar.classList.toggle('hidden', hidden);
@@ -345,14 +351,14 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
     function hideSidebar() {
         sidebar.classList.add('hidden');
         mainContent.classList.add('shifted');
-        try { localStorage.setItem('sidebarHidden', '1'); } catch(e){}
+        try { portalStorage.setItem('sidebarHidden', '1'); } catch(e){}
         syncShowButton();
     }
 
     function showSidebar() {
         sidebar.classList.remove('hidden');
         mainContent.classList.remove('shifted');
-        try { localStorage.setItem('sidebarHidden', '0'); } catch(e){}
+        try { portalStorage.setItem('sidebarHidden', '0'); } catch(e){}
         syncShowButton();
     }
 

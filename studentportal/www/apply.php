@@ -1,108 +1,40 @@
 <?php
-session_start();
-require_once("db.php");
-
-// Show errors while testing (remove in production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php?msg=please_login");
-    exit();
-}
+require_once __DIR__ . '/bootstrap.php';
+require_login();
+require_once __DIR__ . '/application_service.php';
+require __DIR__ . '/db.php';
 $user_id = (int)$_SESSION['user_id'];
-
 $scholarship_error = '';
 $form_error = '';
-
-// Handle form submit
+$selectedScholarship = filter_var(input_value($_POST, 'scholarship_id', input_value($_GET, 'scholarship_id')), FILTER_VALIDATE_INT);
+$values = [
+    'name' => input_value($_POST, 'name', $_SESSION['name'] ?? ''),
+    'email' => input_value($_POST, 'email', $_SESSION['email']),
+    'gwa' => input_value($_POST, 'gwa'),
+    'course' => input_value($_POST, 'course'),
+    'year' => input_value($_POST, 'year'),
+];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $scholarship_id = (int)($_POST['scholarship_id'] ?? 0);
-    $name   = trim($_POST['name'] ?? '');
-    $email  = trim($_POST['email'] ?? '');
-    $gwa    = trim($_POST['gwa'] ?? '');
-    $course = trim($_POST['course'] ?? '');
-    $year   = trim($_POST['year'] ?? '');
-
-    // Validate scholarship
-    if ($scholarship_id > 0) {
-        $stmt_check = $conn->prepare("SELECT scholarship_id FROM scholarships WHERE scholarship_id = ? AND LOWER(status)='active'");
-        $stmt_check->bind_param("i", $scholarship_id);
-        $stmt_check->execute();
-        $result_check = $stmt_check->get_result();
-        if ($result_check->num_rows === 0) {
-            $scholarship_error = "❌ Invalid or inactive scholarship selected.";
-        }
-        $stmt_check->close();
+    if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+        http_response_code(413);
+        $form_error = 'The upload exceeds the server limit. Select fewer or smaller files.';
     } else {
-        $scholarship_error = "❌ Please choose a scholarship.";
-    }
-
-    // Check required fields
-    if (empty($scholarship_error)) {
-        if ($name === '' || $email === '' || $gwa === '' || $course === '' || $year === '') {
-            $form_error = "⚠️ Please fill in all required fields.";
-        }
-    }
-
-    // File uploads
-    $uploadedNames = [];
-    if (empty($form_error) && empty($scholarship_error)) {
-        $uploadDir = __DIR__ . '/uploads/';
-        if (!is_dir($uploadDir)) {
-            @mkdir($uploadDir, 0775, true);
-        }
-
-        if (isset($_FILES['documents']) && is_array($_FILES['documents']['tmp_name'])) {
-            foreach ($_FILES['documents']['tmp_name'] as $key => $tmp_name) {
-                if (!is_uploaded_file($tmp_name)) continue;
-
-                $original = $_FILES['documents']['name'][$key];
-                $ext = strtolower(pathinfo($original, PATHINFO_EXTENSION));
-                if (!in_array($ext, ['pdf','jpg','jpeg'])) {
-                    $form_error = "⚠️ Only PDF or JPG files are allowed.";
-                    break;
-                }
-
-                $safeBase = preg_replace('/[^a-zA-Z0-9_\-]/', '_', pathinfo($original, PATHINFO_FILENAME));
-                $fileName = $safeBase . '_' . uniqid() . '.' . $ext;
-
-                $targetPath = $uploadDir . $fileName;
-                if (move_uploaded_file($tmp_name, $targetPath)) {
-                    $uploadedNames[] = $fileName;
-                }
+        verify_csrf();
+        try {
+            submit_portal_application($conn, $user_id, $selectedScholarship, $values, $_FILES['documents'] ?? null);
+            redirect_to('apply.php?success=1');
+        } catch (InvalidArgumentException $exception) {
+            $form_error = $exception->getMessage();
+        } catch (RuntimeException $exception) {
+            if ($exception instanceof mysqli_sql_exception) {
+                throw $exception;
             }
+            $form_error = $exception->getMessage();
         }
-    }
-
-    // Save application
-    if (empty($form_error) && empty($scholarship_error)) {
-        $uploaded_files = implode(",", $uploadedNames);
-
-        $stmt = $conn->prepare("INSERT INTO applications 
-            (user_id, scholarship_id, name, course, email, gwa, year_level, uploaded_files) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("iissssss", 
-            $user_id, $scholarship_id, $name, $course, $email, $gwa, $year, $uploaded_files
-        );
-
-        if ($stmt->execute()) {
-            $stmt->close();
-            $conn->close();
-            header("Location: apply.php?success=1");
-            exit();
-        } else {
-            $form_error = "❌ Something went wrong saving your application. Please try again.";
-        }
-        $stmt->close();
     }
 }
-
-// Fetch active scholarships for dropdown
 $scholarships = [];
-$res = $conn->query("SELECT scholarship_id, name, deadline FROM scholarships WHERE LOWER(status)='active'");
+$res = $conn->query("SELECT scholarship_id, name, deadline FROM scholarships WHERE LOWER(status) = 'active' AND (deadline IS NULL OR deadline >= CURDATE()) ORDER BY deadline IS NULL, deadline, name");
 while ($row = $res->fetch_assoc()) {
     $scholarships[] = $row;
 }
@@ -111,6 +43,7 @@ $conn->close();
 <!DOCTYPE html>
 <html>
 <head>
+  <script src="js/preferences.js"></script>
     <title>Scholarship Application</title>
     <style>
         :root {
@@ -145,6 +78,8 @@ $conn->close();
         body.dark-mode #successModal .modal-content { background: #222; color: #f0f0f0; }
         .error-box { color: #b00020; background: #ffe6e6; border: 1px solid #b00020; padding: 10px; margin-bottom: 15px; border-radius: 6px; }
     </style>
+  <link rel="stylesheet" href="css/portal.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
@@ -155,13 +90,13 @@ $conn->close();
         <a href="view_applications.php">Status Applications</a>
         <a href="contact.php">Contact</a>
         <a href="FAQ.php">FAQ</a>
-        <a href="logout.php">Logout</a>
+        <?= logout_form() ?>
     </nav>
     <button class="darkmode-btn" id="toggleMode">🌙 Toggle Dark Mode</button>
 </div>
 
 <div class="header">
-    <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin-right: 10px;" />
+    <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin-right: 10px;" />
     <h2>PLMun Scholarship</h2>
 </div>
 
@@ -178,46 +113,48 @@ $conn->close();
             <?php endif; ?>
 
             <form method="POST" enctype="multipart/form-data">
+                <?= csrf_field() ?>
                 <h3>Select Scholarship</h3>
+                <?php if (!$scholarships): ?><p class="form-feedback">No scholarships are currently accepting applications.</p><?php endif; ?>
                 <select name="scholarship_id" required>
                     <option value="">-- Choose Scholarship --</option>
                     <?php foreach ($scholarships as $s): ?>
-                        <option value="<?php echo $s['scholarship_id']; ?>">
+                        <option value="<?= (int)$s['scholarship_id'] ?>" <?= $selectedScholarship === (int)$s['scholarship_id'] ? 'selected' : '' ?>>
                             <?php echo htmlspecialchars($s['name']); ?> 
-                            (Deadline: <?php echo htmlspecialchars($s['deadline']); ?>)
+                            (<?= $s['deadline'] === null ? 'No deadline announced' : 'Deadline: ' . e($s['deadline']) ?>)
                         </option>
                     <?php endforeach; ?>
                 </select>
 
                 <h3>Personal Information</h3>
                 <label>Full Name</label>
-                <input type="text" name="name" required />
+                <input type="text" name="name" maxlength="100" value="<?= e($values['name']) ?>" required />
 
                 <label>Email Address</label>
-                <input type="email" name="email" required />
+                <input type="email" name="email" maxlength="254" value="<?= e($values['email']) ?>" required />
 
                 <h3>Academic Info</h3>
                 <label>GWA</label>
-                <input type="text" name="gwa" required />
+                <input type="text" name="gwa" maxlength="6" value="<?= e($values['gwa']) ?>" required />
 
                 <label>Course</label>
-                <input type="text" name="course" required />
+                <input type="text" name="course" maxlength="150" value="<?= e($values['course']) ?>" required />
 
                 <label>Year Level</label>
                 <select name="year" required>
                     <option value="">Select Year</option>
-                    <option>1st Year</option>
-                    <option>2nd Year</option>
-                    <option>3rd Year</option>
-                    <option>4th Year</option>
+                    <option <?= $values['year'] === '1st Year' ? 'selected' : '' ?>>1st Year</option>
+                    <option <?= $values['year'] === '2nd Year' ? 'selected' : '' ?>>2nd Year</option>
+                    <option <?= $values['year'] === '3rd Year' ? 'selected' : '' ?>>3rd Year</option>
+                    <option <?= $values['year'] === '4th Year' ? 'selected' : '' ?>>4th Year</option>
                 </select>
 
                 <h3>📎 Required Documents</h3>
-                <label>Upload Files (PDF or JPG only)</label>
+                <label>Upload 1–10 Files (PDF or JPG, up to 5 MB each)</label>
                 <input type="file" name="documents[]" accept=".pdf,.jpg,.jpeg" multiple required />
 
                 <br>
-                <button type="submit">Submit Application</button>
+                <button type="submit" <?= !$scholarships ? 'disabled' : '' ?>>Submit Application</button>
             </form>
         </div>
     </div>
@@ -233,14 +170,14 @@ $conn->close();
 
 <script>
     // Dark mode
-    const savedTheme = localStorage.getItem("theme") || "light";
+    const savedTheme = portalStorage.getItem("theme") || "light";
     document.body.classList.add(savedTheme + "-mode");
 
     document.getElementById("toggleMode").addEventListener("click", () => {
         const isDark = document.body.classList.contains("dark-mode");
         document.body.classList.toggle("dark-mode");
         document.body.classList.toggle("light-mode");
-        localStorage.setItem("theme", isDark ? "light" : "dark");
+        portalStorage.setItem("theme", isDark ? "light" : "dark");
         document.getElementById("toggleMode").textContent = isDark ? "🌙 Toggle Dark Mode" : "☀️ Toggle Light Mode";
     });
 

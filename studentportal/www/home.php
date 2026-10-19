@@ -1,43 +1,30 @@
 <?php
-session_start();
-if (!isset($_SESSION['email'])) {
-    header("Location: index.php");
-    exit();
-}
-
-// (Optional) show PHP errors while debugging — remove/comment in production
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-// === DB CONNECTION ===
-$host = "fdb1034.awardspace.net";
-$user = "4669763_john";
-$password = "plmun2023";
-$database = "4669763_john";
-
-$conn = new mysqli($host, $user, $password, $database);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// === FETCH STATS FOR DASHBOARD ===
+require_once __DIR__ . '/bootstrap.php';
+require_login();
+require __DIR__ . '/db.php';
+$userId = (int)$_SESSION['user_id'];
+$stmt = $conn->prepare('SELECT * FROM applications WHERE user_id = ? ORDER BY application_date DESC');
+$stmt->bind_param('i', $userId);
+$stmt->execute();
+$result = $stmt->get_result();
+$applications = $result->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 $counts = ['Pending' => 0, 'Approved' => 0, 'Rejected' => 0];
-$total = 0;
-
-$status_query = $conn->query("SELECT status, COUNT(*) as count FROM applications GROUP BY status");
-while ($row = $status_query->fetch_assoc()) {
-    $counts[$row['status']] = (int)$row['count'];
-    $total += (int)$row['count'];
+foreach ($applications as $application) {
+    if (isset($counts[$application['status']])) {
+        $counts[$application['status']]++;
+    }
 }
+$total = count($applications);
 $percentages = [];
 foreach ($counts as $status => $count) {
-    $percentages[$status] = $total > 0 ? round(($count / $total) * 100, 1) : 0;
+    $percentages[$status] = $total > 0 ? round($count / $total * 100, 1) : 0;
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="js/preferences.js"></script>
   <meta charset="UTF-8" />
   <title>PLMun Scholarship Portal</title>
 
@@ -45,9 +32,9 @@ foreach ($counts as $status => $count) {
   <script>
     (function () {
       try {
-        var theme = localStorage.getItem('theme') || 'light';
+        var theme = portalStorage.getItem('theme') || 'light';
         if (theme === 'dark') document.documentElement.classList.add('pre-dark');
-        var sb = localStorage.getItem('sidebarHidden');
+        var sb = portalStorage.getItem('sidebarHidden');
         if (sb === '1') document.documentElement.classList.add('pre-sidebar-hidden');
       } catch (e) { /* ignore */ }
     })();
@@ -278,6 +265,8 @@ foreach ($counts as $status => $count) {
     }
     .sidebar.hidden .sidebar-edge-toggle{ display:none; } /* hide when sidebar hidden (header button still available) */
   </style>
+  <link rel="stylesheet" href="css/portal.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
@@ -288,7 +277,7 @@ foreach ($counts as $status => $count) {
     <a href="view_applications.php">Status Applications</a>
     <a href="contact.php">Contact</a>
     <a href="FAQ.php">FAQ</a>
-    <a href="logout.php">Logout</a>
+    <?= logout_form() ?>
     <button class="darkmode-btn" id="modeToggle" type="button">🌙</button>
 
     <!-- NEW: Hide/Show toggle pinned to middle-right of the sidebar -->
@@ -300,7 +289,7 @@ foreach ($counts as $status => $count) {
       aria-label="Hide sidebar"
     >
       <!-- Replace src with your actual icon location -->
-      <img src="assets/hide_12252279.png" alt="Hide icon" onerror="this.style.display='none'; this.parentElement.textContent='⮜';" />
+      <img src="img/hide.png" alt="Hide icon" onerror="this.style.display='none'; this.parentElement.textContent='⮜';" />
     </button>
   </div>
 
@@ -308,7 +297,7 @@ foreach ($counts as $status => $count) {
   <div class="header" id="header">
     <div style="display:flex; align-items:center; gap:10px;">
       <button class="toggle-btn" id="btnSidebar" type="button" title="Toggle Sidebar" aria-label="Toggle Sidebar">☰</button>
-      <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px;" />
+      <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px;" />
       <h2>Pamantasan ng Lungsod ng Muntinlupa</h2>
     </div>
   </div>
@@ -338,10 +327,10 @@ foreach ($counts as $status => $count) {
       <ul>
         <li>Academic Commitment for Excellence Program (ACE)</li>
         <li>International Student Training Exchange Program (I-STEP)</li>
-        <li>Board Delivery for Outstanding Academic Results and Delivery (BOARD)</li>
-        <li>Cultural, Athletics, ROTC Incentives (CARRI)</li>
-        <li>Research and Excellence Award Program (CREATE)</li>
-        <li>Scholars' Empowerment Assistance for Leadership (SEAL)</li>
+        <li>CARRI (Cultural, Athletics, Rescue and ROTC Incentives)</li>
+        <li>BOARD Program (Board review assistance for graduating/outstanding academic results)</li>
+        <li>CREATE (Comprehensive Research and Excellence Award for Transformative Education)</li>
+        <li>SEAL (Scholar's Empowerment Assistance for Leadership)</li>
         <li>PLMun Masteral Scholarship</li>
       </ul>
     </div>
@@ -368,7 +357,7 @@ foreach ($counts as $status => $count) {
         <li>Provide financial help to parents of deserving students.</li>
         <li>Offer real-world office experience to students.</li>
       </ol>
-      <img class="img-fluid" src="494357771_1889081168545182_276995763447389085_n.jpg" alt="Student Assistant">
+      <img class="img-fluid" src="img/494357771_1889081168545182_276995763447389085_n.jpg" alt="Student Assistant">
       <h4>Application Process:</h4>
       <ul>
         <li>Initial screening by OSA-CSFA</li>
@@ -404,13 +393,13 @@ foreach ($counts as $status => $count) {
     function applySavedStates() {
       try {
         // Theme
-        const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedTheme = portalStorage.getItem('theme') || 'light';
         const isDark = savedTheme === 'dark';
         document.body.classList.toggle('dark-mode', isDark);
         if (modeToggle) modeToggle.textContent = isDark ? '☀️' : '🌙 ';
 
         // Sidebar
-        const hidden = localStorage.getItem('sidebarHidden') === '1';
+        const hidden = portalStorage.getItem('sidebarHidden') === '1';
         if (sidebar) sidebar.classList.toggle('hidden', hidden);
         if (header)  header.classList.toggle('shifted', hidden);
         if (content) content.classList.toggle('shifted', hidden);
@@ -427,14 +416,14 @@ foreach ($counts as $status => $count) {
       if (content) content.classList.toggle('shifted', nowHidden);
       if (footer)  footer.classList.toggle('shifted', nowHidden);
       setEdgeToggleLabel(nowHidden); // NEW
-      try { localStorage.setItem('sidebarHidden', nowHidden ? '1' : '0'); } catch(e){}
+      try { portalStorage.setItem('sidebarHidden', nowHidden ? '1' : '0'); } catch(e){}
     }
 
     function toggleDarkMode(){
       const isDark = !document.body.classList.contains('dark-mode');
       document.body.classList.toggle('dark-mode', isDark);
       if (modeToggle) modeToggle.textContent = isDark ? '☀️' : '🌙';
-      try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e){}
+      try { portalStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e){}
     }
 
     // Bind events (guard if elements are missing)

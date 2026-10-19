@@ -1,0 +1,24 @@
+/* Shared fixes for the existing page layouts. */
+* { box-sizing: border-box; }
+.logout-form { display: inline-block; margin: 0; }
+.logout-form button { font: inherit; font-weight: bold; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; width: auto; margin: 0; }
+.sidebar .logout-form { display: block; }
+.sidebar .logout-form button { color: var(--text-color, #24362c); padding: 10px 20px; width: 100%; text-align: left; font-weight: normal; }
+.logout-form button:hover { text-decoration: underline; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #b88400; outline-offset: 2px; }
+.form-feedback { background: #fff8df; color: #503e09; padding: 12px; border-radius: 6px; margin: 12px 0; }
+.table-scroll { overflow-x: auto; }
+.table-section { overflow-x: auto; }
+@media (max-width: 700px) {
+    .sidebar { position: static; width: 100%; height: auto; padding: 8px 0; display: flex; flex-direction: row; flex-wrap: wrap; }
+    .sidebar.hidden { display: none; transform: none; }
+    .sidebar nav { display: flex; flex-wrap: wrap; }
+    .sidebar-edge-toggle { position: static; transform: none; margin: 8px; }
+    .header, .content, .main-content, #footer { margin-left: 0; padding: 12px; }
+    .header h2 { font-size: 18px; }
+    .container { max-width: 100%; padding: 10px; }
+    header { flex-wrap: wrap; gap: 16px; }
+    header nav { display: flex; flex-wrap: wrap; gap: 12px; }
+    header nav a { margin: 0; }
+    .dashboard .card { width: 100%; }
+}

@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "PLMun Scholarship Portal",
+    "slug": "plmun-scholarship-portal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/plmun-logo.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/plmun-logo.png",
+        "backgroundColor": "#123C2E"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/plmun-logo.png",
+      "name": "PLMun Scholarship Portal",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "scheme": "plmun-scholarships",
+    "plugins": [
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-router"
+    ]
+  }
+}

@@ -1,6 +1,11 @@
+<?php
+require_once __DIR__ . '/bootstrap.php';
+require_login();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="js/preferences.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PLMun Scholarship FAQs</title>
@@ -221,6 +226,7 @@
     .sidebar.hidden .sidebar-edge-toggle { display: none; } /* when sidebar hidden */
     /* ===== End edge toggle styles ===== */
   </style>
+  <link rel="stylesheet" href="css/portal.css">
 </head>
 <body>
   <div class="sidebar" id="sidebar">
@@ -229,7 +235,7 @@
     <a href="view_applications.php">Status Applications</a>
     <a href="contact.php">Contact</a>
     <a href="FAQ.php" class="active">FAQ</a>
-    <a href="logout.php">Logout</a>
+    <?= logout_form() ?>
 
     <!-- NEW: hide button pinned to middle-right of the sidebar -->
     <button
@@ -240,7 +246,7 @@
       aria-label="Hide sidebar"
     >
       <!-- Use your uploaded icon; adjust path if needed -->
-      <img src="hide.png" alt="Hide icon"
+      <img src="img/hide.png" alt="Hide icon"
            onerror="this.style.display='none'; this.parentElement.textContent='⮜';" />
     </button>
   </div>
@@ -248,7 +254,7 @@
   <div class="header" id="header">
     <div style="display: flex; align-items: center;">
       <button class="toggle-btn" id="btnSidebar" type="button" title="Toggle Sidebar" aria-label="Toggle Sidebar">☰</button>
-      <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin: 0 10px;" />
+      <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin: 0 10px;" />
       <h2>Pamantasan ng Lungsod ng Muntinlupa</h2>
     </div>
   </div>
@@ -331,11 +337,11 @@
 
     function applySavedStates() {
       // Theme
-      const savedTheme = localStorage.getItem('theme');
+      const savedTheme = portalStorage.getItem('theme');
       if (savedTheme === 'dark') document.body.classList.add('dark-mode');
 
       // Sidebar visibility
-      const hidden = localStorage.getItem('sidebarHidden') === '1';
+      const hidden = portalStorage.getItem('sidebarHidden') === '1';
       sidebar.classList.toggle('hidden', hidden);
       header.classList.toggle('shifted', hidden);
       content.classList.toggle('shifted', hidden);
@@ -346,7 +352,7 @@
       sidebar.classList.toggle('hidden', nowHidden);
       header.classList.toggle('shifted', nowHidden);
       content.classList.toggle('shifted', nowHidden);
-      try { localStorage.setItem('sidebarHidden', nowHidden ? '1' : '0'); } catch(e){}
+      try { portalStorage.setItem('sidebarHidden', nowHidden ? '1' : '0'); } catch(e){}
     }
 
     function toggleAnswer(card) {
@@ -368,7 +374,7 @@
     window.toggleDarkmode = function () {
       const isDark = !document.body.classList.contains("dark-mode");
       document.body.classList.toggle("dark-mode", isDark);
-      try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e){}
+      try { portalStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e){}
     };
   </script>
 </body>

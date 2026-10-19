@@ -1,11 +1,20 @@
 
 <?php
-require_once("config.php");
+require_once __DIR__ . '/bootstrap.php';
+require_login();
+require __DIR__ . '/db.php';
+$search = substr(input_value($_GET, 'search'), 0, 200);
+$pattern = '%' . $search . '%';
+$stmt = $conn->prepare("SELECT * FROM scholarships WHERE LOWER(status) = 'active' AND (deadline IS NULL OR deadline >= CURDATE()) AND (name LIKE ? OR description LIKE ?) ORDER BY deadline IS NULL, deadline, name");
+$stmt->bind_param('ss', $pattern, $pattern);
+$stmt->execute();
+$result = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="js/preferences.js"></script>
   <meta charset="UTF-8" />
   <title>Available Scholarships</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -124,6 +133,8 @@ body.dark-mode .card:hover {
 
 
   </style>
+  <link rel="stylesheet" href="css/portal.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
@@ -133,11 +144,11 @@ body.dark-mode .card:hover {
     <a href="view_applications.php">Status Applications</a>
     <a href="contact.php">Contact</a>
     <a href="FAQ.php">FAQ</a>
-    <a href="logout.php">Logout</a>
+    <?= logout_form() ?>
 </div>
 
 <div class="header">
-    <img src="tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin-right: 10px;" />
+    <img src="img/tumblr_o4ti6j8k6r1unefbyo1_400.png" alt="Logo" style="height: 40px; margin-right: 10px;" />
     <h2>Pamantasan ng Lungsod ng Muntinlupa</h2>
 </div>
 
@@ -147,28 +158,20 @@ body.dark-mode .card:hover {
 
         <!-- Search Form -->
         <form method="GET" class="d-flex mb-4">
-            <input type="text" name="search" class="form-control me-2" placeholder="Search scholarships..." value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" />
+            <input type="text" name="search" class="form-control me-2" placeholder="Search scholarships..." value="<?php echo e($search); ?>" />
             <button type="submit" class="btn btn-success">Search</button>
         </form>
 
       <div class="row scholarship-list">
 <?php
-$search = $_GET['search'] ?? '';
-$search = $conn->real_escape_string($search);
-
-$query = "SELECT * FROM scholarships"; 
-$result = $conn->query($query);
-
-if (!$result) {
-    echo "<div class='alert alert-danger'>Query Error: " . $conn->error . "</div>";
-} elseif ($result->num_rows > 0) {
+if ($result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
         echo "<div class='col-md-6 col-lg-4 mb-4'>";
         echo "  <div class='card h-100 shadow-sm'>";
         echo "    <div class='card-body'>";
         echo "      <h5 class='card-title'>" . htmlspecialchars($row['name']) . "</h5>";
         echo "      <p class='card-text'>" . htmlspecialchars($row['description']) . "</p>";
-        echo "      <p class='card-text'><strong>Deadline:</strong> " . htmlspecialchars($row['deadline']) . "</p>";
+        echo "      <p class='card-text'><strong>Deadline:</strong> " . e($row['deadline'] ?? 'No deadline announced') . "</p>";
         echo "      <a href='apply.php?scholarship_id=" . urlencode($row['scholarship_id']) . "' class='btn btn-success'>Apply Now</a>";
         echo "    </div>";
         echo "  </div>";
@@ -179,11 +182,14 @@ if (!$result) {
 }
 ?>
 </div>
+</div>
+</div>
+<?php $stmt->close(); $conn->close(); ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     window.onload = function () {
-        const savedTheme = localStorage.getItem('theme');
+        const savedTheme = portalStorage.getItem('theme');
         if (savedTheme === 'dark') {
             document.body.classList.add('dark-mode');
         }
