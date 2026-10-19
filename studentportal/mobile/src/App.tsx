@@ -71,7 +71,7 @@ function Brand({ inverse = false }: { inverse?: boolean }) {
       <View>
         <Txt
           bold
-          size={18}
+          size={inverse ? 17 : 18}
           style={{
             color: inverse ? "#F5F5E8" : colors.text,
             letterSpacing: 0.4,
@@ -80,11 +80,11 @@ function Brand({ inverse = false }: { inverse?: boolean }) {
           PLMun
         </Txt>
         <Txt
-          size={9}
+          size={inverse ? 8.5 : 9}
           bold
           style={{
             color: inverse ? "#B6CEBD" : colors.muted,
-            letterSpacing: 1.8,
+            letterSpacing: inverse ? 1.5 : 1.8,
           }}
         >
           SCHOLARSHIP PORTAL

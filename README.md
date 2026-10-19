@@ -58,6 +58,35 @@ Open **http://localhost:8081**. Changes to `mobile/src` update through Metro. Ru
 The browser uses the API on the same origin in the exported app, or port `8080`
 when using the Expo development server on `8081`.
 
+### Vercel deployment
+
+Import this GitHub repository into Vercel with Root Directory
+`studentportal/mobile`. The included `mobile/vercel.json` installs with `npm ci`,
+builds with `npm run build:web`, serves `dist`, and routes page refreshes through
+the Expo app. Local Vercel project settings in `.vercel` are excluded from Git.
+
+This configuration publishes the frontend. A working portal also needs the PHP
+backend, MySQL database, and private document storage on an HTTPS server.
+`127.0.0.1` and `localhost` refer to each visitor's own machine and cannot be used
+as the deployed backend address.
+
+Before publishing the full portal, add an explicit `/api.php` rewrite **before**
+the frontend fallback, pointing at the real hosted `api.php` URL. Keep
+`EXPO_PUBLIC_API_URL` unset for this browser deployment so API requests and session
+cookies use the Vercel origin. Add the exact Vercel site origin to the PHP server's
+`PORTAL_ALLOWED_ORIGINS`. Verify session cookies, login, uploads, and protected
+document viewing on the deployed site. Do not route the API through the SPA
+fallback or use a wildcard CORS origin. Direct requests from a Vercel domain to an
+unrelated backend domain require additional cookie/session configuration.
+
+The PHP host needs the current `www` files, private configuration, schema and seed
+data, and writable private `storage` directory described below. Configure its
+document root as `www`, and block public `/uploads/` access. The database and
+documents are not uploaded by deploying `mobile` to Vercel.
+
+References: [Expo web publishing](https://docs.expo.dev/guides/publishing-websites/)
+and [Vercel API rewrites](https://vercel.com/docs/routing/rewrites).
+
 ### Phone development
 
 Run `npm run mobile:start` from `studentportal`, or `npm run android` / `npm run ios`
